@@ -6,7 +6,18 @@ created by mone27 with ale-ci"""
 
 import string # for generating trial version of matrix
 import random
+import time
+import threading
 
+def caricamento():
+    roll = ['-', '\\', '|', '/']
+
+    def _carica():
+        while True:
+            for i in roll:
+                print(f"\rLoading... {i}", end="")
+                time.sleep(0.5)
+    threading.Thread(target=_carica).start()
 
 class Gnuciverba():
 
@@ -22,4 +33,6 @@ class Gnuciverba():
 
 if __name__ == "__main__":
     gnu = Gnuciverba()
-    print(gnu)
+    print
+    caricamento()
+    # print(gnu)
