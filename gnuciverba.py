@@ -11,25 +11,21 @@ import threading
 
 
 class LoadingWidget:
+    """this makes rolling widget on cli to show the user that the program is working
+    Usage: load_widget = LoadingWidget([message="Loading...])
+    start() return immediatly and starts printing on the screen message and the rolling wheel
+    stop() stops the wheel to roll
 
-
-    # class _Load(threading.Thread):
-    #     """Thread class with a stop() method. The thread itself has to check
-    #     regularly for the stopped() condition."""
-    #
-    #     def __init__(self):
-    #         super(_Load, self).__init__()
-    #         self._stop_event = threading.Event()
-    #
-    #     def stop(self):
-    #         self._stop_event.set()
-    #
-    #     def stopped(self):
-    #         return self._stop_event.is_set()
+    it can also be used with context manager e.g.
+    with LoadingWidget:
+        # here do operation while it shows on the screen the rolling wheel
+    # here the wheel is stopped
+    """
 
     roll = ['-', '\\', '|', '/']
 
-    def __init__(self):
+    def __init__(self, message="Loading..."):
+        self.message = message
         self.kill = threading.Event()
         self.thread = threading.Thread(target=self._load, args=(self.kill,))
 
@@ -53,7 +49,7 @@ class LoadingWidget:
         while not kill_event.wait(0.5):
             if i >= 4:  # 4 is the len of roll not using len(roll) to avoid runtime overhead
                 i = 0
-            print(f"\rLoading... {self.roll[i]}", end="")
+            print(f"\r{self.message}{self.roll[i]}", end="")
             i += 1
         print("\r\n") # clears the screen
 
