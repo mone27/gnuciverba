@@ -8,6 +8,11 @@ import string # for generating trial version of matrix
 import random
 import time
 import threading
+import logging
+import numpy as np # not rally necessary but it is nice to use it :D
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 class LoadingWidget:
@@ -54,26 +59,38 @@ class LoadingWidget:
         print("\r\n") # clears the screen
 
 
-
 class Gnuciverba:
 
-    def __init__(self, x: int, y: int):
+    def __init__(self, x: int, y: int, dict_file):
         # generate random x*y matrix
-        self.crossword = [[random.choice(string.ascii_lowercase) for _ in range(x)] for _ in range(y)]
+        self.crossword = np.array([[random.choice(string.ascii_lowercase) for _ in range(x)] for _ in range(y)])
+        with open(dict_file) as f:
+            self.dict = {i for i in f.read().splitlines() if len(i) <= min(x, y)}  # removes words that are too long
+
+        log.debug(f"using this dictionary: {self.dict}")
+        self._write_on_row("ciao")
+        self._write_on_column("bene")
+
+        # it takes a random word and put it in a random position
+    def _write_on_column(self, word, start=(0,0)):  # maybe add type notations
+        self.crossword[start[0]:len(word), start[1]] = list(word)
+
+    def _write_on_row(self, word, start=(0,0)):
+        self.crossword[start[0], start[1]:len(word)] = list(word)
 
     def __str__(self):
         return "".join(" ".join(i)+"\n" for i in self.crossword)
+
     def __repr__(self):
         return self.__str__()
 
 
 if __name__ == "__main__":
-    load = LoadingWidget().start()
-    gnu = Gnuciverba(20, 20)
-    time.sleep(10)
-    load.stop()
-    print(gnu)
+    logging.basicConfig(level=logging.DEBUG)
+
     with LoadingWidget():
-        time.sleep(5)
+        gnu = Gnuciverba(5, 5, "1000_parole_italiane_comuni.txt")
+    print(gnu)
+
     print("congratulation now you have to find the sense of this crossword")
 
