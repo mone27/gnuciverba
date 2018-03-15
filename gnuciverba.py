@@ -11,8 +11,10 @@ import threading
 import logging
 import numpy as np # not rally necessary but it is nice to use it :D
 
+np.random.seed(5)
+
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 
 
 class LoadingWidget:
@@ -58,6 +60,30 @@ class LoadingWidget:
             i += 1
         print("\r\n") # clears the screen
 
+class Word:
+    def __init__(self, word, position, direction):
+        self.letters = []
+        if direction == 'horizontal':
+            x = position[0]
+            y = position[1]
+            swap = False
+        elif direction == 'vertical':
+            x = position[1]
+            y = position[0]
+            swap = True
+        else:
+            raise ValueError(f"{direction} is not a valid direction")
+        self.direction = direction    # not a good idea memory full of useless strings should optimize
+        for i,c in enumerate(word):
+            pos = [x, y + i]
+            if swap: pos[0], pos[1] = pos[1], pos[0]
+            self.letters.append((c, pos))
+
+    def __str__(self):
+        return ''.join([c[0] for c in self.letters])
+
+    def __repr__(self):
+        return str(self)
 
 class Gnuciverba:
 
@@ -66,38 +92,45 @@ class Gnuciverba:
         self.crossword[:, :] = '#'  # init matrix
         self.x = x
         self.y = y
-        with open(dict_file) as f:
-            self.dict = np.array([i for i in f.read().splitlines() if len(i) <= min(x, y)])  # removes words that are too long
+        self.dict = []
+        for length in range(min(x,y), 0, -1):
+            with open(dict_file) as f: # TODO optimize not a good idea open file and read it many times
+                self.dict.append(np.array([i for i in f.read().splitlines() if len(i) == length]))
 
         log.debug(f"using this dictionary: {self.dict}")
         self.directions = ['vertical','horizontal']
-        self.written_words = {i:[] for i in self.directions}
+        self.written_words = []
 
     def generate(self):
         # put a random word in the crossword
-        # np.random.seed(3)  # maybe not the best place
+         # maybe not the best place
 
-        np.random.shuffle(self.dict)
+        for lenght_class in self.dict:
+            np.random.shuffle(lenght_class)
+
+
         log.debug(f"using this shuffled dictionary: {self.dict}")
 
-        for word in self.dict:
-            self._write_word(word)
+        for lenght_class in self.dict:
+            for word in lenght_class:
+                self._write_word(word)
+        return self
 
     def _write_word(self, word ):
 
         np.random.shuffle(self.directions)
-        for direction in self.directions:   # add randomness
+        for direction in self.directions:   # TODO add randomness
             for column in range(self.y):
                 for row in range((self.x - len(word) + 1)):  # every position in the row
                     if self._write_on_crossword(word, (row, column), direction):
                         log.debug(f"written word '{word}' at position ({row},{column}) with direction: {direction}")
                         log.debug(f"crossword now: {self.crossword}")
-                        self.written_words[direction].append((word,(row,column)))
+                        self.written_words.append(Word(word,(row,column), direction))
                         return True
             # log.debug(f"could not write word: {word}")
             return False
 
-    def _write_on_crossword(self, word, start=(0,0), direction='vertical'):
+    def _write_on_crossword(self, word, start=(0,0), direction='vertical'): # cambai so cavolo di nome che non si capisce niente
         if direction == 'vertical':
             row, column = start
             x, y = self.x, self.y
@@ -125,10 +158,31 @@ class Gnuciverba:
             return False # if there is a collision so it cannot replace the word
 
     def _can_put_string(self, old_word, new_word):
+        # TODO calculate the number of intersection
         for c1,c2 in zip(old_word, new_word):
            if c2 != c1 and c1 != '#':
                 return False
         return True
+
+    def score(self):
+        """find the score of the crossword taking into account the number of common letter between words,
+         the length of the words and the number of blank places """
+        pass
+
+    def _number_common_letters(self) -> int:
+        number_letters = 0
+        # not a good way for long arrays bad idea to compare with all the words in the crossword
+        for first_word in self.written_words:
+            for second_word in self.written_words:
+                if first_word.letters == second_word.letters : continue  # the two word are the same
+                for l in first_word.letters:
+                    if l in second_word.letters:
+                        number_letters += 1
+                        log.debug(f"found common letter between {first_word} and {second_word} at {l} "
+                                  f"cross direction: {True if second_word.direction != first_word.direction else False}")
+        return number_letters
+
+
 
     def _write_on_row(self, word, start=(0,0)):
         self.crossword[start[0], start[1]:len(word)] = list(word)
@@ -141,22 +195,46 @@ class Gnuciverba:
 
     def _get_written_words(self):
         words = []
-        for dir_label, dir_words in self.written_words.items():
-            words += [dir_label, ": \n"]
-            for word in dir_words:
-                words += ['\t \'', word[0], '\' at position: ', str(word[1][0]), ' ', str(word[1][1]), '\n' ]
+        for word in self.written_words:
+            words += ['\t \'', ''.join([i[0] for i in word.letters]), '\' at position: ',str(word.letters[0][1][0]),
+                         ' ', str(word.letters[0][1][1]), ' direction: ', word.direction, '\n']
         return ''.join(words)
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)  # !DEBUG
+def get_best_crossword():
+    score_max = 0
+    loading = LoadingWidget().start()
+    for _ in range(200):
+        seed = int(time.time())
+        np.random.seed(seed)
+        cross = Gnuciverba(10, 10, "1000_parole_italiane_comuni.txt").generate()
+        score = cross._number_common_letters()
+        if score > score_max:
+            cross_max = cross
+            score_max = score
+            i_max = seed
+
+    loading.stop()
+
+    print(cross_max)
+    print(score_max)
+    print("with random seed:",i_max)
+
+
+def main_testing():
+    logging.basicConfig(level=logging.DEBUG)  # !DEBUG
 
     with LoadingWidget():
         gnu = Gnuciverba(10, 10, "1000_parole_italiane_comuni.txt")
         gnu.generate()
-        print(gnu)
-        # prints written words in a pretty way
-
+    print(gnu)
+    print(gnu._number_common_letters())
 
     print("congratulation now you have to find the sense of this crossword")
+
+
+if __name__ == "__main__":
+    main_testing()
+    # get_best_crossword()
+
 
